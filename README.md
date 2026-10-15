@@ -66,6 +66,16 @@ PDF 檔、護照等個資不要放進這個 repo（`.gitignore` 已排除 `*.pdf
 
 測試：`npm run test:sync`（假的 Supabase，在 Node 內模擬兩支手機：即時、離線、重新載入、衝突、種子升級）。`tests/sync/real-e2e.mjs` 是對真的後端跑的版本（需先開啟匿名登入）。
 
+## 私人票券資料（階段 3a）
+
+訂位代號與行程單 PDF 不進 repo、不進 `seed.json`，放在 Supabase：
+
+- 私有 Storage bucket `trip-files`（上限 10 MB，只收 PDF 與圖片）。檔案路徑一律 `<trip_id>/...`，RLS 只允許該行程的成員讀寫（`private.is_member_of_path`）。
+- `items` 新增集合 `ticketPrivate`（每張票一列：`{ bookingCodes, files:[{label, path}] }`）。App 只讀、不回寫；同步引擎把它放進 `STORE.ticketPrivate`。資料表有一個 trigger（`zz_items_guard_ticket_private`），舊版 App 對它寫刪除標記時會被當作沒事發生。
+- 票券頁的 PDF 按鈕會即時向 Storage 要一個 10 分鐘有效的簽名網址再開新分頁；離線或失敗會跳提示。
+- 上傳（本機手動，不在 CI）：`node scripts/push-private.mjs BIBO-KAMF-26`。來源是 `sheet/private/tickets-private.json` 與 `prototype-v3/tickets/*.pdf`（可用 `--private`、`--pdf-dir` 改）。腳本以暱稱「上傳工具」匿名加入、上傳、寫入 `ticketPrivate`，最後呼叫 `leave_trip()` 離開行程；之後暫時的匿名使用者可在後台刪除。
+- RPC `leave_trip(p_trip)`：刪掉呼叫者自己的成員列。設定裡的「離開行程」按鈕會呼叫它（離線時只清本機）。
+
 ## 問 BIBO 與匯率（Supabase Edge Functions，階段 2）
 
 - `supabase/functions/ask-bibo`：代理 DeepSeek（`deepseek-chat`，非串流，30 秒逾時）。金鑰放在 Supabase 密鑰 `DEEPSEEK_API_KEY`，不進 repo、不進前端。只有已加入行程的人能呼叫（否則 403）；同一人 24 小時內超過 60 次回 429（紀錄在 `ask_log`，用戶端完全讀不到）。回答一律繁體中文，票價、開放時間、班次、預約一律回答「沒辦法確認」。

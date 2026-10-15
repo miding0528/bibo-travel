@@ -95,7 +95,7 @@ var STORE = {
   itineraryDone:{}, itineraryOrder:{}, spotFav:{}, chat:null, checklist:null, ticketStatus:{}, expenses:null,
   days:null, customSpots:[], notes:'', todaySelectedDay:null, dataVersion:0,
   memberNames:{ Lena:'Lena', Key:'Key' }, feePercent:1.5, fxRatesOverride:{},
-  tickets:null, ticketAlerts:{}
+  tickets:null, ticketAlerts:{}, ticketPrivate:{}
 };
 (function loadStore(){
   try{
@@ -132,6 +132,7 @@ var STORE = {
   if(!STORE.feePercent){ STORE.feePercent = 1.5; }
   if(!STORE.fxRatesOverride){ STORE.fxRatesOverride = {}; }
   if(!STORE.ticketAlerts){ STORE.ticketAlerts = {}; }
+  if(!STORE.ticketPrivate){ STORE.ticketPrivate = {}; }
   if(!STORE.tickets){
     STORE.tickets = DATA.tickets.map(function(t){
       var c = {}; for(var k in t){ c[k]=t[k]; }
@@ -2062,7 +2063,26 @@ function renderSpotDetail(id){
   var bibotip = spot.bibotip || (spot.tips ? spot.tips.replace(/（請再確認）/,'') + '，請再確認汪！' : '相關資訊還在整理，請再確認汪！');
   var tipBanner = '<div class="bg-surface-container-low p-space-md rounded-xl shadow-sm flex items-center gap-space-sm mb-space-lg"><div class="w-10 h-10 rounded-full bg-primary-fixed-dim/60 flex items-center justify-center text-on-primary-fixed shrink-0"><span class="material-symbols-outlined text-[20px]">pets</span></div><div class="flex flex-col flex-1 min-w-0"><p class="font-label-md text-label-md text-primary font-bold">BIBO 的探訪小提醒</p><p class="font-body-sm text-body-sm text-on-surface-variant">'+bibotip+'</p></div></div>';
 
-  var contentIntro = introCard + storyCard + connCard + highlightsPreview;
+  var routeSection = (spot.route && spot.route.length) ? (
+    '<div class="flex flex-col gap-space-sm pt-space-xs"><div class="flex items-center gap-space-xs"><span class="w-2.5 h-2.5 rounded-full bg-primary-container"></span><h2 class="font-headline-md text-headline-md text-on-surface">建議路線</h2></div>'
+    +'<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm"><div class="flex flex-col gap-space-sm text-body-sm">'
+    +spot.route.map(function(step,i){
+      return '<div class="flex items-start gap-space-sm bg-surface-container-low p-space-sm rounded-lg">'
+        +'<div class="w-6 h-6 rounded-full bg-primary-fixed-dim text-on-primary-fixed flex items-center justify-center font-bold text-label-sm shrink-0 mt-0.5">'+(i+1)+'</div>'
+        +'<p class="text-on-surface-variant leading-relaxed">'+step+'</p></div>';
+    }).join('')
+    +'</div></div></div>'
+  ) : '';
+  var triviaSection = (spot.trivia && spot.trivia.length) ? (
+    '<div class="flex flex-col gap-space-sm pt-space-xs"><div class="flex items-center gap-space-xs"><span class="w-2.5 h-2.5 rounded-full bg-primary-container"></span><h2 class="font-headline-md text-headline-md text-on-surface">冷知識</h2></div>'
+    +'<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm"><div class="flex flex-col gap-space-sm">'
+    +spot.trivia.map(function(t){
+      return '<div class="bg-surface-container-low p-2.5 rounded-lg flex items-start gap-2"><span class="material-symbols-outlined text-[18px] text-tertiary mt-0.5">lightbulb</span><div class="text-body-sm text-on-surface-variant leading-relaxed">'+t+'</div></div>';
+    }).join('')
+    +'</div></div></div>'
+  ) : '';
+
+  var contentIntro = introCard + storyCard + connCard + routeSection + triviaSection + highlightsPreview;
 
   var contentHighlights = hasHighlights
     ? '<div class="flex flex-col gap-space-sm">'+spot.highlights.map(highlightCardHTML).join('')+'</div>'
@@ -2324,13 +2344,16 @@ function ticketCTAHTML(t){
   return '<a class="'+cls+'" href="https://www.12306.cn/" target="_blank" rel="noopener"><span>'+(t.buyLabel||'購票')+'</span><span class="material-symbols-outlined text-[14px]">'+icon+'</span></a>';
 }
 
-/* Booking codes + itinerary PDF buttons shown under the dashed line of flight cards (data: t.bookingCodes, t.pdfs). */
+/* Booking codes + itinerary file buttons shown under the dashed line of flight cards.
+   Data comes from STORE.ticketPrivate[t.id] ({ bookingCodes, files:[{label, path}] }), synced read-only from Supabase;
+   the files live in the private Storage bucket and are opened through a short-lived signed URL. */
 function ticketEsc(s){
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function ticketExtraHTML(t){
-  var codes = t.bookingCodes || [], pdfs = t.pdfs || [];
-  if(!codes.length && !pdfs.length) return '';
+  var priv = (STORE.ticketPrivate && STORE.ticketPrivate[t.id]) || {};
+  var codes = priv.bookingCodes || [], files = priv.files || [];
+  if(!codes.length && !files.length) return '';
   var bg = t.warn ? 'bg-error-container/40' : 'bg-surface-container-low';
   var h = '<div class="p-3 px-4 pb-0 '+bg+' flex flex-col gap-2 text-body-sm font-body-sm">';
   if(codes.length){
@@ -2338,14 +2361,29 @@ function ticketExtraHTML(t){
       + codes.map(function(c){ return ticketEsc(c.code) + (c.holder ? '（'+ticketEsc(c.holder)+'）' : ''); }).join('、')
       + '</span></div>';
   }
-  if(pdfs.length){
+  if(files.length){
     h += '<div class="flex flex-wrap items-center gap-2">'
-      + pdfs.map(function(p){
-          return '<a class="shrink-0 px-3 py-1 bg-surface-container-highest text-on-surface rounded-full text-label-sm font-label-sm flex items-center gap-1 active:scale-95 transition-transform ticket-cta-stop" href="'+ticketEsc(p.href)+'" target="_blank" rel="noopener"><span>'+ticketEsc(p.label)+'</span><span class="material-symbols-outlined text-[14px]">open_in_new</span></a>';
+      + files.map(function(p){
+          return '<button class="shrink-0 px-3 py-1 bg-surface-container-highest text-on-surface rounded-full text-label-sm font-label-sm flex items-center gap-1 active:scale-95 transition-transform ticket-cta-stop ticket-private-file" data-path="'+ticketEsc(p.path)+'" type="button"><span>'+ticketEsc(p.label)+'</span><span class="material-symbols-outlined text-[14px]">open_in_new</span></button>';
         }).join('')
       + '</div>';
   }
   return h + '</div>';
+}
+function openPrivateFile(path){
+  if(!Sync || navigator.onLine === false || window.__biboOffline){ showToast('現在沒網路，無法開啟'); return; }
+  /* 先同步開一個空白分頁（避免被擋彈出視窗），簽好網址再導過去 */
+  var w = null;
+  try{ w = window.open('', '_blank'); }catch(e){}
+  Sync.signFile(path, 600).then(function(res){
+    if(res && res.url){
+      if(w){ w.location.href = res.url; }
+      else { window.location.href = res.url; }
+    } else {
+      if(w){ try{ w.close(); }catch(e){} }
+      showToast(res && res.error && res.error.kind === 'offline' ? '現在沒網路，無法開啟' : '無法開啟檔案');
+    }
+  });
 }
 
 function ticketCardHTML(t){
@@ -2393,6 +2431,9 @@ function renderTickets(){
   });
   document.querySelectorAll('.ticket-cta-stop').forEach(function(el){
     el.addEventListener('click', function(e){ e.stopPropagation(); });
+  });
+  document.querySelectorAll('.ticket-private-file').forEach(function(btn){
+    btn.addEventListener('click', function(e){ e.stopPropagation(); openPrivateFile(btn.getAttribute('data-path')); });
   });
   document.querySelectorAll('.ticket-open-doclink').forEach(function(btn){
     btn.addEventListener('click', function(e){ e.stopPropagation(); openTicketEditDrawer(btn.getAttribute('data-id'), true); });

@@ -34,6 +34,10 @@ export function makeClient(db, { offlineRef = { v: false } } = {}) {
         if (!db.members.find(m => m.user_id === user.id)) db.members.push({ user_id: user.id, nickname: args.p_nickname });
         return { data: [{ trip_id: db.trip.id, name: db.trip.name, code: db.trip.code, seed_version: db.trip.seed_version, seed_ids: db.trip.seed_ids }], error: null };
       }
+      if (name === 'leave_trip') {
+        const n = db.members.length; db.members = db.members.filter(m => m.user_id !== user.id);
+        return { data: n - db.members.length, error: null };
+      }
       if (name === 'set_trip_seed') {
         if (db.trip.seed_version < args.p_version) { db.trip.seed_version = args.p_version; db.trip.seed_ids = args.p_ids; return { data: true, error: null }; }
         return { data: false, error: null };
@@ -73,6 +77,17 @@ export function makeClient(db, { offlineRef = { v: false } } = {}) {
         return { data: JSON.parse(JSON.stringify(rows)), error: null };
       }
       return b;
+    },
+    storage: {
+      from(bucket) {
+        return {
+          async createSignedUrl(path, ttl) {
+            guard();
+            if (!db.members.find(m => m.user_id === user.id)) return { data: null, error: { message: 'Object not found' } };
+            return { data: { signedUrl: 'https://fake.storage/' + bucket + '/' + path + '?ttl=' + ttl }, error: null };
+          },
+        };
+      },
     },
     channel() {
       const sub = { active: false, cb: null };

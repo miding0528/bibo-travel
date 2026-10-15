@@ -1,4 +1,4 @@
-import { FakeDB, seed } from './fake.mjs';
+import { FakeDB, seed, pgTs } from './fake.mjs';
 import { Phone, sleep, proj, same, clone, freshStore } from './phone.mjs';
 import assert from 'node:assert/strict';
 
@@ -126,6 +126,41 @@ await Bnew2.sync.start({ hadStore: true }); await sleep(650); assert.equal(Bnew2
   await sleep(700);
   assert.equal(B.day(2).items[1].id, 'new-last');
   ok('deleting / appending / moving one row only rewrites that row (gaps in ord are fine)');
+}
+
+// ---------- ticketPrivate (read-only collection, written only by the upload tool) ----------
+{
+  const putPriv = (id, data, deleted) => {
+    const row = { trip_id: db.trip.id, collection: 'ticketPrivate', item_id: id, data, deleted: !!deleted, updated_at: pgTs(), updated_by: 'tool' };
+    const ex = db.items.has('ticketPrivate|' + id); db.items.set('ticketPrivate|' + id, row); db.broadcast(row, ex ? 'UPDATE' : 'INSERT');
+  };
+  const payload = { bookingCodes: [{ code: 'ABC123', holder: 'TEST' }], files: [{ label: '行程單', path: 'trip-1/tickets/x.pdf' }] };
+  const before = db.log.length;
+  putPriv('t1', payload); await sleep(500);
+  assert.deepEqual(A.store.ticketPrivate.t1, payload); assert.deepEqual(B.store.ticketPrivate.t1, payload);
+  assert.equal(A.sync.status().pending, 0); assert.equal(B.sync.status().pending, 0);
+  A.persist(); B.persist(); await sleep(700);
+  assert.equal(db.log.slice(before).filter(l => l[1].startsWith('ticketPrivate')).length, 0, 'phones never write ticketPrivate');
+  assert.equal(db.items.get('ticketPrivate|t1').deleted, false);
+  assert.ok(!Object.keys(A.sync._debug.outbox()).some(k => k.startsWith('ticketPrivate')));
+  ok('ticketPrivate row lands in STORE.ticketPrivate on both phones and is never written back');
+  putPriv('t1', { ...payload, bookingCodes: [{ code: 'ZZZ999' }] }); await sleep(500);
+  assert.equal(A.store.ticketPrivate.t1.bookingCodes[0].code, 'ZZZ999');
+  putPriv('t1', {}, true); await sleep(500);
+  assert.equal(A.store.ticketPrivate.t1, undefined); assert.equal(B.store.ticketPrivate.t1, undefined);
+  putPriv('t8', payload); await sleep(500);
+  const F = new Phone('Fresh', db); await F.sync.join('BIBO-TEST-00', 'Fresh');
+  assert.deepEqual(F.store.ticketPrivate.t8, payload); assert.equal(F.sync.status().pending, 0);
+  ok('ticketPrivate update / tombstone propagate; a fresh phone pulls it on join');
+  const sg = await F.sync.signFile('trip-1/tickets/x.pdf', 600);
+  assert.ok(sg.url && sg.url.includes('ttl=600'), 'signed url'); ok('signFile returns a short-lived URL');
+  F.setOffline(true);
+  assert.equal((await F.sync.signFile('trip-1/tickets/x.pdf')).error.kind, 'offline'); F.setOffline(false); ok('signFile offline -> error kind offline');
+  const nm = db.members.length;
+  const left = await F.sync.leave();
+  assert.equal(left, true); assert.equal(db.members.length, nm - 1); assert.equal(F.sync.isJoined(), false);
+  assert.deepEqual(F.store.ticketPrivate, {}); ok('leave() removes own member row via leave_trip and clears ticketPrivate locally');
+  putPriv('t8', {}, true); await sleep(300);
 }
 
 // ---------- transient errors ----------

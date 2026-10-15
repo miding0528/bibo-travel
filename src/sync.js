@@ -240,6 +240,10 @@ export function createSync(deps) {
       var sx = findIn(store.customSpots, i);
       if (sx >= 0) replaceInPlace(store.customSpots[sx], rest); else store.customSpots.push(rest);
       touched.spots = true;
+    } else if (c === 'ticketPrivate') {
+      /* 訂位代號與私有檔案路徑：只讀、不回寫（不在 extract() 內，也沒有 base 比對） */
+      store.ticketPrivate = store.ticketPrivate || {};
+      store.ticketPrivate[i] = clone(data);
     } else if (c === 'meta') {
       if (i === 'settings') {
         if (data.memberNames) { store.memberNames = store.memberNames || {}; replaceInPlace(store.memberNames, data.memberNames); }
@@ -269,6 +273,8 @@ export function createSync(deps) {
     } else if (c === 'customSpot') {
       var sx = findIn(store.customSpots || [], i);
       if (sx >= 0) store.customSpots.splice(sx, 1);
+    } else if (c === 'ticketPrivate') {
+      if (store.ticketPrivate) delete store.ticketPrivate[i];
     }
   }
 
@@ -276,6 +282,12 @@ export function createSync(deps) {
     var c = row.collection, i = String(row.item_id), k = c + '|' + i;
     var b = base[k];
     if (!force && b && b.t && cmpTs(row.updated_at, b.t) <= 0) return false;
+    if (c === 'ticketPrivate') {
+      /* 只讀集合：套用到 STORE.ticketPrivate，base 只記時間（s 為 null，所以永遠不會被當成本機變更或刪除） */
+      if (row.deleted) storeRemove(c, i); else storeUpsert(c, i, row.data || {});
+      base[k] = { s: null, t: row.updated_at };
+      return true;
+    }
     if (!force && (outbox[k] || inflight[k])) {
       /* 這一筆本機還有沒送出的修改，送出後會蓋掉遠端；只記下時間 */
       base[k] = { s: b ? b.s : null, t: row.updated_at, o: b ? b.o : undefined };
@@ -341,6 +353,7 @@ export function createSync(deps) {
     store.tickets = []; store.ticketStatus = {}; store.ticketAlerts = {};
     store.expenses = []; store.customSpots = []; store.notes = '';
     store.memberNames = { Lena: 'Lena', Key: 'Key' }; store.feePercent = 1.5; store.fxRatesOverride = {};
+    store.ticketPrivate = {};
   }
 
   function rebuildFrom(rows) {
@@ -688,15 +701,38 @@ export function createSync(deps) {
     }
   }
 
+  /* 離開行程：本機立刻清掉；另外盡力呼叫 leave_trip 把自己的成員資料列刪掉（離線時略過，成員名單會多留一筆）。
+     回傳 Promise<boolean>（雲端是否已移除），呼叫端不必等它。 */
   function leave() {
+    var c = client, t = trip, canRemote = !!(c && t) && isOnline();
+    var remote = canRemote
+      ? c.rpc('leave_trip', { p_trip: t.id }).then(function (r) { return !r.error; }, function () { return false; })
+      : Promise.resolve(false);
     unsubscribe();
     clearAll();
     trip = null; base = {}; outbox = {}; ready = false; started = false; newOrd = {};
     meta = { lastPull: null, lastOrd: 0, seedBump: null };
+    if (store.ticketPrivate && Object.keys(store.ticketPrivate).length) { store.ticketPrivate = {}; ui.persistRaw(); }
+    return remote;
+  }
+
+  /* 私有檔案（行程單 PDF）：簽一個短效網址。回傳 { url } 或 { error: { kind } }，不丟例外。 */
+  async function signFile(path, ttl) {
+    if (!trip) return { error: { kind: 'not_joined' } };
+    if (!isOnline()) return { error: { kind: 'offline' } };
+    try {
+      client = client || deps.getClient();
+      await ensureAuth();
+      var r = await client.storage.from('trip-files').createSignedUrl(path, ttl || 600);
+      if (r.error || !r.data || !r.data.signedUrl) return { error: { kind: 'denied', message: String((r.error && r.error.message) || 'no url') } };
+      return { url: r.data.signedUrl };
+    } catch (e) {
+      return { error: { kind: isNetworkError(e) || (e && e.message === 'offline') ? 'offline' : 'network', message: String((e && e.message) || e) } };
+    }
   }
 
   return {
-    start: start, join: join, leave: leave, callFunction: callFunction, flush: flush, syncNow: syncNow, isJoined: isJoined,
+    start: start, join: join, leave: leave, signFile: signFile, callFunction: callFunction, flush: flush, syncNow: syncNow, isJoined: isJoined,
     onPersist: function () { if (ready && !applying) diffAndEnqueue(); },
     getTrip: function () { return trip; },
     refreshTrip: async function () { if (trip && client && isOnline()) { try { await ensureAuth(); await refreshTrip(); } catch (e) {} } return trip; },
