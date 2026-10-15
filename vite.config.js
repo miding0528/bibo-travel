@@ -38,6 +38,10 @@ export default defineConfig({
         globPatterns: ['**/*.{html,js,css,woff2,png,jpg,jpeg,webp,svg,ico,webmanifest}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         navigateFallback: base + 'index.html',
+        /* Supabase（REST / Auth / Realtime）一律走網路，絕不進快取 */
+        runtimeCaching: [
+          { urlPattern: ({ url }) => url.hostname.endsWith('.supabase.co'), handler: 'NetworkOnly' },
+        ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,

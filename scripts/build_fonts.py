@@ -34,6 +34,7 @@ def collect_text(common):
     chunks = []
     # 1) 現行 App 的 HTML 殼（含 JS 內所有字串）
     for p in (os.path.join(ROOT, 'index.html'), os.path.join(ROOT, 'src', 'main.js'),
+              os.path.join(ROOT, 'src', 'sync.js'), os.path.join(ROOT, 'src', 'sync-ui.js'),
               os.path.join(BIBO, 'prototype-v3', 'index.html')):
         if os.path.exists(p):
             chunks.append(read(p))
@@ -106,6 +107,7 @@ def icon_names():
     glyphs = set(f.getGlyphOrder())
     blob = ''
     for p in (os.path.join(ROOT, 'index.html'), os.path.join(ROOT, 'src', 'main.js'),
+              os.path.join(ROOT, 'src', 'sync.js'), os.path.join(ROOT, 'src', 'sync-ui.js'),
               os.path.join(ROOT, 'src', 'data', 'seed.json')):
         if os.path.exists(p):
             blob += read(p)

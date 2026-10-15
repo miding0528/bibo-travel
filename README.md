@@ -52,6 +52,20 @@ art/                    圖示來源圖
 隱私：票券的「訂位代號」「行程單 PDF」只存在 xlsx 與本機的 `sheet/private/`，匯入時預設不會寫進 `seed.json`（`--strip-private`，預設開啟）。
 PDF 檔、護照等個資不要放進這個 repo（`.gitignore` 已排除 `*.pdf`）。
 
+## 同步（Supabase，階段 1）
+
+兩支手機用「行程代碼＋暱稱」加入同一個行程，資料即時同步；離線照常使用，恢復連線後自動送出（同一筆以最後寫入為準）。
+
+- 後端：Supabase 專案 `bibo-travel`（ref `ksaluzkbeejrlmihqksq`）。資料表 `trips`、`members`、`items`（一筆資料一列，`collection` 分 `dayItem`、`checklist`、`ticket`、`expense`、`customSpot`、`meta`），全部啟用 RLS：沒加入行程（`members`）就讀不到任何東西。加入只能透過 RPC `join_trip`。
+- 登入：Supabase 匿名登入。**專案後台 Authentication -> Sign In / Providers -> 必須開啟「Allow anonymous sign-ins」**，否則 App 會顯示「專案尚未開啟匿名登入」。
+- 前端：`src/sync.js`（同步引擎，不碰 DOM）、`src/sync-ui.js`（加入視窗、分帳設定裡的行程區塊）、`src/supabase.js`（連線常數，publishable 金鑰可公開）。主程式只在 `persist()` 後多呼叫一次 `Sync.onPersist()`，其餘畫面程式未改。
+- 本機狀態（localStorage）：`bibo-sync-trip`（已加入的行程）、`bibo-sync-base`（最後一次處理過的快照，用來比對出變更）、`bibo-sync-outbox`（待送出）、`bibo-sync-meta`。
+- 除錯：`window.__biboOffline = true` 會讓同步器當作離線（關掉後呼叫 `__biboSync.flush()` 或觸發 online 事件）；`__biboSync.status()` 看待送出筆數。
+- 問 BIBO 的對話（`chat`）、今天選的日期、種子版本標記只存本機，不同步。
+- 種子資料升級：已加入行程的手機，等抓完雲端資料後才執行 seedSync，結果寫回雲端並更新 `trips.seed_version`。
+
+測試：`npm run test:sync`（假的 Supabase，在 Node 內模擬兩支手機：即時、離線、重新載入、衝突、種子升級）。`tests/sync/real-e2e.mjs` 是對真的後端跑的版本（需先開啟匿名登入）。
+
 ## 字型與圖示
 
 - Noto Serif TC 只包含 App 實際用到的字（原型 HTML、試算表、content 文件）加上 ASCII、CJK 標點、全形字元。使用者在 App 內輸入了字型裡沒有的罕見字，會自動改用系統的明體。

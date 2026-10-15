@@ -1,5 +1,8 @@
 import './styles.css';
 import seedData from './data/seed.json';
+import { makeClient } from './supabase.js';
+import { createSync } from './sync.js';
+import { createSyncUI } from './sync-ui.js';
 
 /* BIBO Travel 主程式：原型 index.html 的 <script>，邏輯未改。
    唯一差異：種子資料不再內嵌，改由 src/data/seed.json 匯入（var SHEET_DATA = seedData）。
@@ -82,6 +85,11 @@ var DATA_VERSION = 2;
 var SEED_VERSION = SHEET_DATA.seedVersion || 1;
 /* Seed ids that shipped before the spreadsheet pipeline existed (phones with no STORE.seedIds fall back to these). */
 var LEGACY_SEED_IDS = {"days": ["d1-0", "d1-1", "d1-2", "d1-3", "d1-4", "d1-5", "d1-6", "d1-7", "d1-8", "d1-9", "d2-0", "d2-1", "d2-2", "d2-3", "d2-4", "d2-5", "d2-6", "d2-7", "d2-8", "d3-0", "d3-1", "d3-2", "d3-3", "d3-4", "d3-5", "d3-6", "d3-7", "d4-0", "d4-1", "d4-2", "d4-3", "d4-4", "d4-5", "d4-6", "d4-7", "d4-8", "d4-9", "d5-0", "d5-1", "d5-2", "d5-3", "d5-4", "d5-5", "d5-6", "d5-7", "d5-8", "d6-0", "d6-1", "d6-2", "d6-3", "d6-3b", "d6-4", "d6-5", "d6-6", "d7-0", "d7-1", "d7-2", "d7-3", "d7-4", "d7-5", "d7-6", "d8-0", "d8-1", "d8-2", "d8-3", "d8-4", "d9-0", "d9-1", "d9-2", "d9-3", "d9-4", "d9-5", "d9-6", "d9-7", "d10-0", "d10-1", "d10-2", "d10-3", "d10-4", "d10-5", "d10-6"], "prep": ["p-transport-1", "p-transport-2", "p-transport-3", "p-transport-4", "p-transport-5", "p-transport-6", "p-ticket-1", "p-ticket-2", "p-ticket-3", "p-ticket-4", "p-ticket-5", "p-ticket-6", "p-ticket-7", "p-hotel-1", "p-hotel-2", "p-hotel-3", "p-hotel-4", "p-network-1", "p-insurance-1", "p-other-1", "p-other-2"], "packing": ["k-docs-1", "k-docs-2", "k-docs-3", "k-docs-4", "k-docs-5", "k-docs-6", "k-docs-7", "k-docs-8", "k-gadgets-1", "k-gadgets-2", "k-gadgets-3", "k-gadgets-4", "k-gadgets-5", "k-gadgets-6", "k-care-1", "k-care-2", "k-care-3", "k-care-4", "k-care-5", "k-care-6", "k-care-7", "k-care-8", "k-care-9", "k-clothes-1", "k-clothes-2", "k-clothes-3", "k-clothes-4", "k-clothes-5", "k-clothes-6", "k-clothes-7", "k-clothes-8", "k-clothes-9", "k-other-1", "k-other-2", "k-other-3", "k-other-4"], "tickets": ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"]};
+
+/* ---- 同步（Supabase）相關旗標：載入 STORE 之前先讀 ---- */
+var JOINED = false, HAD_STORE = false, syncSeedAllowed = false, drawerLocked = false;
+try{ JOINED = !!localStorage.getItem('bibo-sync-trip'); HAD_STORE = !!localStorage.getItem('bibo-v3-store'); }catch(e){}
+var Sync = null, SyncUI = null;
 
 var STORE = {
   itineraryDone:{}, itineraryOrder:{}, spotFav:{}, chat:null, checklist:null, ticketStatus:{}, expenses:null,
@@ -201,6 +209,8 @@ function currentSeedIds(){
 function seedIdSet(list){ var m = {}; (list||[]).forEach(function(id){ m[id] = true; }); return m; }
 function seedCopy(o){ var c = {}; for(var k in o){ c[k] = o[k]; } return c; }
 function seedSync(fresh){
+  /* 已加入共同行程時，種子升級改由 sync 在抓完雲端資料之後執行（sync.js 的 seedStep），避免用過期的本機勾選覆蓋對方 */
+  if(JOINED && !syncSeedAllowed) return;
   var newIds = currentSeedIds();
   if(fresh){
     STORE.seedVersion = SEED_VERSION; STORE.seedIds = newIds;
@@ -285,8 +295,12 @@ function seedSync(fresh){
   persist();
 }
 
-function persist(){
+function persistRaw(){
   try{ localStorage.setItem('bibo-v3-store', JSON.stringify(STORE)); }catch(e){}
+}
+function persist(){
+  persistRaw();
+  if(Sync) Sync.onPersist();
 }
 
 function fxRateFor(date){
@@ -355,8 +369,10 @@ function openDrawer(innerHTML, onMount){
   if(onMount) onMount();
 }
 function closeDrawer(){
+  if(drawerLocked) return;
   document.getElementById('drawer-root').innerHTML = '';
 }
+function lockDrawer(v){ drawerLocked = !!v; }
 window.closeDrawer = closeDrawer;
 
 /* ---------------- DATE / MISC HELPERS ---------------- */
@@ -1591,6 +1607,7 @@ function splitSettingsDrawerHTML(){
     +'<div class="space-y-space-xs"><span class="font-label-md text-label-md text-on-surface font-bold">刷卡手續費預設（%）</span><input type="number" step="0.1" id="ss-fee" class="w-full bg-surface-container-lowest rounded-xl p-space-sm shadow-sm font-body-md text-body-md text-on-surface focus:outline-none" value="'+STORE.feePercent+'"></div>'
     +'<div class="space-y-space-xs"><span class="font-label-md text-label-md text-on-surface font-bold">每日匯率（1 人民幣＝？台幣）</span><div class="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">'+fxRows+'</div></div>'
     +'<button class="w-full py-2.5 rounded-full bg-primary-container text-on-primary font-label-lg text-label-lg font-bold shadow-sm" id="ss-save" type="button">儲存設定</button>'
+    +(SyncUI ? SyncUI.settingsSectionHTML() : '')
     +'<div class="pt-space-sm border-t border-outline-variant/40 space-y-space-sm">'
     +'<button class="w-full py-2.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md font-bold shadow-sm flex items-center justify-center gap-1.5" id="ss-copy" type="button"><span class="material-symbols-outlined text-[18px]">content_copy</span><span>複製帳本文字</span></button>'
     +'<div id="ss-clear-samples-wrap"><button class="w-full py-2.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md font-bold shadow-sm flex items-center justify-center gap-1.5" id="ss-clear-samples" type="button"><span class="material-symbols-outlined text-[18px]">delete_sweep</span><span>清除範例支出</span></button></div>'
@@ -1608,6 +1625,7 @@ function twoKeyConfirm(wrapId, msg, onConfirm){
 }
 function openSplitSettingsDrawer(){
   openDrawer(splitSettingsDrawerHTML(), function(){
+    if(SyncUI) SyncUI.bindSettingsSection();
     document.getElementById('ss-save').addEventListener('click', function(){
       var nameA = document.getElementById('ss-name-lena').value.trim();
       var nameB = document.getElementById('ss-name-key').value.trim();
@@ -2984,7 +3002,58 @@ function route(){
   window.scrollTo(0,0);
 }
 
+/* 遠端資料套用後重畫目前畫面（不能呼叫 route()，它會關掉正在編輯的視窗） */
+function refreshCurrentView(){
+  try{
+    var parts = (location.hash || '#today').replace('#','').split('/');
+    var view = parts[0] || 'today';
+    if(view === 'today') renderTodayPage();
+    else if(view === 'plan') renderDay();
+    else if(view === 'spots') renderSpots();
+    else if(view === 'split') renderSplit();
+    else if(view === 'lists') renderLists();
+    else if(view === 'tickets') renderTickets();
+    else if(view === 'spot' && parts[1] && findSpotById(parts[1])) renderSpotDetail(parts[1]);
+  }catch(e){ if(window.console) console.warn('refresh failed', e); }
+}
+
 window.addEventListener('hashchange', route);
 document.addEventListener('DOMContentLoaded', route);
+
+/* ---------------- SYNC (Supabase) ---------------- */
+Sync = createSync({
+  store: STORE, DATA: DATA, storage: window.localStorage,
+  getClient: makeClient,
+  isOnline: function(){ return navigator.onLine !== false && !window.__biboOffline; },
+  ui: {
+    toast: showToast,
+    refresh: refreshCurrentView,
+    persistRaw: persistRaw,
+    sortTickets: sortTicketsByDate,
+    needJoin: function(){ SyncUI.showJoin(); }
+  },
+  seed: {
+    get version(){ return SEED_VERSION; },
+    currentIds: currentSeedIds,
+    run: function(){ syncSeedAllowed = true; try{ seedSync(false); }finally{ syncSeedAllowed = false; } }
+  },
+  env: {
+    on: function(ev, fn){
+      if(ev === 'online') window.addEventListener('online', fn);
+      else if(ev === 'offline') window.addEventListener('offline', fn);
+      else if(ev === 'visible') document.addEventListener('visibilitychange', function(){ if(!document.hidden) fn(); });
+    },
+    setInterval: function(fn, ms){ return window.setInterval(fn, ms); },
+    isHidden: function(){ return document.hidden; }
+  }
+});
+SyncUI = createSyncUI({
+  openDrawer: openDrawer, closeDrawer: closeDrawer, lockDrawer: lockDrawer,
+  showToast: showToast, twoKeyConfirm: twoKeyConfirm, sync: Sync
+});
+window.__biboSync = Sync;
+function bootSync(){ Sync.start({ hadStore: HAD_STORE }); }
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootSync);
+else bootSync();
 
 })();

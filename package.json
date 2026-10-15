@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "fonts": "python scripts/build_fonts.py",
     "icons": "python scripts/build_icons.py",
-    "audit:tailwind": "node scripts/audit-tailwind.mjs"
+    "audit:tailwind": "node scripts/audit-tailwind.mjs",
+    "test:sync": "node tests/sync/test-sync.mjs"
   },
   "devDependencies": {
     "autoprefixer": "^10.6.1",
@@ -19,5 +20,8 @@
     "vite-plugin-pwa": "^2.0.0",
     "workbox-build": "^7.4.1",
     "workbox-window": "^7.4.1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3"
   }
 }
