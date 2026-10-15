@@ -66,6 +66,14 @@ PDF 檔、護照等個資不要放進這個 repo（`.gitignore` 已排除 `*.pdf
 
 測試：`npm run test:sync`（假的 Supabase，在 Node 內模擬兩支手機：即時、離線、重新載入、衝突、種子升級）。`tests/sync/real-e2e.mjs` 是對真的後端跑的版本（需先開啟匿名登入）。
 
+## 問 BIBO 與匯率（Supabase Edge Functions，階段 2）
+
+- `supabase/functions/ask-bibo`：代理 DeepSeek（`deepseek-chat`，非串流，30 秒逾時）。金鑰放在 Supabase 密鑰 `DEEPSEEK_API_KEY`，不進 repo、不進前端。只有已加入行程的人能呼叫（否則 403）；同一人 24 小時內超過 60 次回 429（紀錄在 `ask_log`，用戶端完全讀不到）。回答一律繁體中文，票價、開放時間、班次、預約一律回答「沒辦法確認」。
+- `supabase/functions/fx-rate`：每天一次取台灣銀行牌告人民幣即期賣出（失敗改現金賣出），存進 `fx_rates`（成員可讀、只有 service role 可寫）。**台銀網站對腳本請求會回 JavaScript 驗證頁（Challenge Validation），抓不到 CSV 時改用 open.er-api.com 的中間價當備援，`source` 欄位會註明來源。**
+- 前端：`Sync.callFunction(name, body)` 呼叫兩支函式。取回的匯率只放在 `DATA.fxRates` 的「今天」那一格（`localStorage` 的 `bibo-fx-cache` 記住當天已抓過），分帳設定裡手動改過的匯率永遠優先。問 BIBO 的對話只存本機。
+- 部署：兩支函式都開 JWT 驗證（`verify_jwt`），兩個資料夾裡的 `common.ts` 必須保持一致。`supabase/migrations/` 是已套用的 SQL 紀錄。
+- 對真實後端的檢查：`node tests/sync/real-phase2.mjs BIBO-XXXX-XX`（會建立匿名使用者，跑完要清掉）。
+
 ## 字型與圖示
 
 - Noto Serif TC 只包含 App 實際用到的字（原型 HTML、試算表、content 文件）加上 ASCII、CJK 標點、全形字元。使用者在 App 內輸入了字型裡沒有的罕見字，會自動改用系統的明體。
