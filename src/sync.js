@@ -93,20 +93,58 @@ export function createSync(deps) {
     return newOrd[k];
   }
 
+  /* 清單型項目（行程項目、清單）的排序值：盡量沿用每一列已送出的 order，刪除其他列不會牽動它們。
+     只有順序真的被改（排序、移動）或新增時，才替「不再遞增」的列重新配值（落在前後兩個已定值之間，可為小數）。 */
+  function seqOrders(items, keyOf) {
+    var n = items.length, out = new Array(n), kept = new Array(n), i, j, k;
+    /* 已有 order 的列中，取最長的嚴格遞增子序列保持不動（只動了一列的搬移／新增，其他列都不會被改寫） */
+    var vals = [], idxs = [];
+    for (i = 0; i < n; i++) {
+      var b = base[keyOf(items[i])];
+      if (b && typeof b.o === 'number' && isFinite(b.o)) { vals.push(b.o); idxs.push(i); }
+    }
+    var tails = [], prev = new Array(vals.length);
+    for (i = 0; i < vals.length; i++) {
+      var lo0 = 0, hi0 = tails.length;
+      while (lo0 < hi0) { var mid = (lo0 + hi0) >> 1; if (vals[tails[mid]] < vals[i]) lo0 = mid + 1; else hi0 = mid; }
+      prev[i] = lo0 > 0 ? tails[lo0 - 1] : -1;
+      tails[lo0] = i;
+    }
+    for (var t = tails.length ? tails[tails.length - 1] : -1; t >= 0; t = prev[t]) { out[idxs[t]] = vals[t]; kept[idxs[t]] = true; }
+    i = 0;
+    while (i < n) {
+      if (kept[i]) { i++; continue; }
+      j = i; while (j < n && !kept[j]) j++;
+      var cnt = j - i, lo = i > 0 ? out[i - 1] : null, hi = j < n ? out[j] : null;
+      for (k = 0; k < cnt; k++) {
+        if (lo !== null && hi !== null) out[i + k] = lo + (hi - lo) * (k + 1) / (cnt + 1);
+        else if (lo !== null) out[i + k] = lo + k + 1;
+        else if (hi !== null) out[i + k] = hi - (cnt - k);
+        else out[i + k] = k;
+      }
+      i = j;
+    }
+    return out;
+  }
+
   /* STORE -> Map(key -> {c, i, data, s}) */
   function extract() {
     var out = new Map();
     function add(c, i, data, o) { out.set(c + '|' + i, { c: c, i: i, data: data, s: canon(data), o: o }); }
     (store.days || []).forEach(function (d) {
-      (d.items || []).forEach(function (it, idx) {
-        var o = clone(it); o.day = d.day; o.order = idx;
-        add('dayItem', String(it.id), o, idx);
+      var items = d.items || [];
+      var ords = seqOrders(items, function (it) { return 'dayItem|' + it.id; });
+      items.forEach(function (it, idx) {
+        var o = clone(it); o.day = d.day; o.order = ords[idx];
+        add('dayItem', String(it.id), o, ords[idx]);
       });
     });
     ['prep', 'packing'].forEach(function (tab) {
-      ((store.checklist && store.checklist[tab]) || []).forEach(function (it, idx) {
-        var o = clone(it); o.tab = tab; o.order = idx;
-        add('checklist', tab + '/' + it.id, o, idx);
+      var list = (store.checklist && store.checklist[tab]) || [];
+      var ords = seqOrders(list, function (it) { return 'checklist|' + tab + '/' + it.id; });
+      list.forEach(function (it, idx) {
+        var o = clone(it); o.tab = tab; o.order = ords[idx];
+        add('checklist', tab + '/' + it.id, o, ords[idx]);
       });
     });
     (store.tickets || []).forEach(function (t) {
@@ -620,6 +658,7 @@ export function createSync(deps) {
       bindEnv();
       subscribe();
       await flush();
+      if (ui.joined) { try { ui.joined(); } catch (e) {} }
       return res;
     } catch (e) {
       /* 加入成功但後續失敗（例如斷線）：保留行程，下次 syncNow 會重做 firstAttach */
@@ -627,6 +666,25 @@ export function createSync(deps) {
       bindEnv();
       handleError(e, 'join');
       throw e;
+    }
+  }
+
+  /* 呼叫 Edge Function（問 BIBO、匯率）。回傳 { data } 或 { error: { kind, status, code, message } }，不丟例外。
+     kind: not_joined / offline / http / network */
+  async function callFunction(name, body) {
+    if (!trip) return { error: { kind: 'not_joined' } };
+    if (!isOnline()) return { error: { kind: 'offline' } };
+    try {
+      client = client || deps.getClient();
+      await ensureAuth();
+      var r = await client.functions.invoke(name, { body: body || {} });
+      if (!r.error) return { data: r.data };
+      var err = r.error, ctx = err.context, status = ctx && ctx.status, payload = null;
+      if (ctx && typeof ctx.json === 'function') { try { payload = await ctx.json(); } catch (e) { payload = null; } }
+      if (status) return { error: { kind: 'http', status: status, code: payload && payload.error, message: payload && payload.message } };
+      return { error: { kind: 'network', message: String(err.message || err) } };
+    } catch (e) {
+      return { error: { kind: isNetworkError(e) || (e && e.message === 'offline') ? 'offline' : 'network', message: String((e && e.message) || e) } };
     }
   }
 
@@ -638,7 +696,7 @@ export function createSync(deps) {
   }
 
   return {
-    start: start, join: join, leave: leave, flush: flush, syncNow: syncNow, isJoined: isJoined,
+    start: start, join: join, leave: leave, callFunction: callFunction, flush: flush, syncNow: syncNow, isJoined: isJoined,
     onPersist: function () { if (ready && !applying) diffAndEnqueue(); },
     getTrip: function () { return trip; },
     refreshTrip: async function () { if (trip && client && isOnline()) { try { await ensureAuth(); await refreshTrip(); } catch (e) {} } return trip; },

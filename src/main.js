@@ -307,6 +307,42 @@ function fxRateFor(date){
   return (STORE.fxRatesOverride && STORE.fxRatesOverride[date]) || DATA.fxRates[date] || 4.4;
 }
 
+/* ---- 台銀當日匯率（Edge Function fx-rate）----
+   取回的匯率只放在 DATA.fxRates（不進 STORE、不同步），所以設定裡手動改過的匯率（fxRatesOverride）永遠優先。 */
+var FX_CACHE_KEY = 'bibo-fx-cache';
+function fxTodayKey(){ var d = new Date(); return (d.getMonth()+1)+'/'+d.getDate(); }
+function fxTodayStamp(){ var d = new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function fxApply(rate){
+  var r = Number(rate);
+  if(!isFinite(r) || r < 3 || r > 7) return false;
+  DATA.fxRates[fxTodayKey()] = Math.round(r*10000)/10000;
+  return true;
+}
+function fxLoadCache(){
+  try{
+    var c = JSON.parse(localStorage.getItem(FX_CACHE_KEY) || 'null');
+    if(c && fxApply(c.rate)) return c;
+  }catch(e){}
+  return null;
+}
+var fxBusy = false;
+function refreshFx(force){
+  if(fxBusy || !Sync || !Sync.isJoined()) return;
+  var cache = null;
+  try{ cache = JSON.parse(localStorage.getItem(FX_CACHE_KEY) || 'null'); }catch(e){}
+  if(!force && cache && cache.stamp === fxTodayStamp()) return;
+  if(navigator.onLine === false || window.__biboOffline) return;
+  fxBusy = true;
+  Sync.callFunction('fx-rate', {}).then(function(res){
+    fxBusy = false;
+    var d = res && res.data;
+    if(d && fxApply(d.rate)){
+      try{ localStorage.setItem(FX_CACHE_KEY, JSON.stringify({ stamp: fxTodayStamp(), rate: Number(d.rate), source: d.source || '', date: d.date || '' })); }catch(e){}
+      refreshCurrentView();
+    }
+  });
+}
+
 function memberName(key){ return (STORE.memberNames && STORE.memberNames[key]) || key; }
 function feeMultiplier(){ return 1 + (STORE.feePercent||1.5)/100; }
 
@@ -1635,7 +1671,9 @@ function openSplitSettingsDrawer(){
       if(!isNaN(fee) && fee>=0) STORE.feePercent = fee;
       document.querySelectorAll('.fx-rate-input').forEach(function(inp){
         var v = parseFloat(inp.value);
-        if(!isNaN(v) && v>0) STORE.fxRatesOverride[inp.getAttribute('data-date')] = v;
+        var dk = inp.getAttribute('data-date');
+        /* 沒改過、也沒有手動設定的列不要存成覆寫（否則自動帶入的當日匯率會被凍住） */
+        if(!isNaN(v) && v>0 && (STORE.fxRatesOverride[dk] !== undefined || v !== parseFloat(inp.defaultValue))) STORE.fxRatesOverride[dk] = v;
       });
       persist();
       closeDrawer();
@@ -2896,23 +2934,53 @@ function chatBubbleHTML(msg){
     +'</div>';
 }
 
-function askAnswerFor(question){
-  var found = null;
-  DATA.askQuick.forEach(function(q){ if(q.q === question) found = q; });
-  if(found) return {kind:'text', text: found.a};
-  if(question === DATA.askLongmenQ) return {kind:'card', title:DATA.askLongmenA.title, text:DATA.askLongmenA.text, tip:DATA.askLongmenA.tip};
-  return {kind:'text', text:'這是原型，正式版會接 DeepSeek 回答你的問題。'};
+function escHtml(t){
+  return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function plainToHtml(t){ return escHtml(t).replace(/\r?\n/g,'<br>'); }
+
+var askPending = null;   /* 正在等 DeepSeek 回答的氣泡（只存在記憶體，不進對話紀錄） */
+
+function askDayHint(){
+  var key = fxTodayKey(), hit = null;
+  (STORE.days || []).forEach(function(d){ if(d.date === key) hit = d; });
+  return hit ? ('Day '+hit.day+'（'+hit.date+'）'+(hit.title||'')) : '';
+}
+
+function askErrorText(err){
+  if(!err) return '暫時無法連線，請稍後再試';
+  if(err.kind === 'offline') return '現在沒網路，等連上再問我';
+  if(err.kind === 'not_joined') return '先加入行程，我才能回答你';
+  if(err.kind === 'http'){
+    if(err.code === 'no_key') return '尚未設定 DeepSeek 金鑰';
+    if(err.status === 429 && err.code === 'rate_limited') return '問太多次了，休息一下';
+    if(err.status === 403 || err.status === 401) return '先加入行程，我才能回答你';
+    if(err.status === 400 && err.message) return err.message;
+    if(err.status === 503 || err.status === 504) return err.message || '暫時無法連線，請稍後再試';
+  }
+  return '暫時無法連線，請稍後再試';
 }
 
 function sendChatMessage(text){
   text = (text||'').trim();
   if(!text) return;
-  STORE.chat.push({role:'user', text:text, time: nowTimeStr()});
-  var ans = askAnswerFor(text);
-  if(ans.kind === 'card'){ STORE.chat.push({role:'bot', kind:'card', title:ans.title, text:ans.text, tip:ans.tip, time: nowTimeStr()}); }
-  else { STORE.chat.push({role:'bot', kind:'text', text:ans.text, time: nowTimeStr()}); }
+  if(askPending){ showToast('BIBO 還在想上一題'); return; }
+  if(text.length > 500){ showToast('問題太長了，請縮短到 500 字以內'); return; }
+  STORE.chat.push({role:'user', text:escHtml(text), time: nowTimeStr()});
   persist();
+  askPending = { role:'bot', kind:'text', text:'BIBO 想一下…', time: nowTimeStr() };
   renderAsk();
+  var body = { question: text };
+  var hint = askDayHint();
+  if(hint) body.dayHint = hint;
+  Sync.callFunction('ask-bibo', body).then(function(res){
+    askPending = null;
+    var answer = res && res.data && typeof res.data.answer === 'string' ? res.data.answer.trim() : '';
+    if(answer){ STORE.chat.push({role:'bot', kind:'text', text:plainToHtml(answer), time: nowTimeStr()}); }
+    else { STORE.chat.push({role:'bot', kind:'text', text:escHtml(askErrorText(res && res.error)), time: nowTimeStr()}); }
+    persist();
+    renderAsk();
+  });
 }
 
 function renderAsk(){
@@ -2920,7 +2988,7 @@ function renderAsk(){
   var quickHTML = DATA.askQuick.map(function(q){
     return '<button class="ask-quick-chip shrink-0 px-3.5 py-2 rounded-full bg-surface-container-lowest hover:bg-primary-fixed shadow-sm text-on-surface font-body-sm text-body-sm transition-all text-left flex items-center gap-1.5 active:scale-95" data-question="'+q.q.replace(/"/g,'&quot;')+'" type="button"><span class="material-symbols-outlined text-[16px] '+q.iconColor+'">'+q.icon+'</span><span>'+q.q+'</span></button>';
   }).join('');
-  var messagesHTML = STORE.chat.map(chatBubbleHTML).join('');
+  var messagesHTML = STORE.chat.map(chatBubbleHTML).join('') + (askPending ? chatBubbleHTML(askPending) : '');
   var html = ''
     +'<div class="relative bg-surface-container-lowest rounded-xl p-space-md shadow-sm overflow-hidden flex items-center justify-between">'
     +'<div class="flex items-center gap-space-sm z-10 min-w-0 pr-2"><div class="w-14 h-14 rounded-full bg-primary-fixed flex items-center justify-center shrink-0 overflow-hidden shadow-sm"><img alt="BIBO" class="w-full h-full object-cover" src="assets/stitch/hero-bibo.png"></div>'
@@ -3030,6 +3098,7 @@ Sync = createSync({
     refresh: refreshCurrentView,
     persistRaw: persistRaw,
     sortTickets: sortTicketsByDate,
+    joined: function(){ refreshFx(); },
     needJoin: function(){ SyncUI.showJoin(); }
   },
   seed: {
@@ -3052,7 +3121,9 @@ SyncUI = createSyncUI({
   showToast: showToast, twoKeyConfirm: twoKeyConfirm, sync: Sync
 });
 window.__biboSync = Sync;
-function bootSync(){ Sync.start({ hadStore: HAD_STORE }); }
+window.__biboFx = { refresh: refreshFx, todayKey: fxTodayKey };
+fxLoadCache();
+function bootSync(){ Sync.start({ hadStore: HAD_STORE }); refreshFx(); }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootSync);
 else bootSync();
 

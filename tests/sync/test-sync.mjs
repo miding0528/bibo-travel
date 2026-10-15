@@ -104,6 +104,30 @@ assert.ok(A.store.days[1].items.find(x => x.id === 'seed-new-1')); assert.equal(
 const Bnew2 = new Phone('Key', db, { storage: B.storage, store: JSON.parse(B.storage.get('bibo-v3-store')), seedVersion: seed.seedVersion + 1 });
 await Bnew2.sync.start({ hadStore: true }); await sleep(650); assert.equal(Bnew2.seedRuns, 0); ok('seed sync not repeated once trip is at that version');
 
+// ---------- deleting one row must not rewrite the others (ord / order churn) ----------
+{
+  await sleep(700);
+  for (let i = 0; i < 4; i++) A.store.expenses.push({ id: 'del-x' + i, date: '12/27', title: 't' + i, amount: 1, payer: 'Lena', method: '現金', split: 'even', rateOverride: 4.4 });
+  A.persist(); await sleep(700);
+  assert.equal(A.sync.status().pending, 0);
+  const outboxKeys = () => Object.keys(A.sync._debug.outbox());
+  A.store.expenses.splice(A.store.expenses.findIndex(e => e.id === 'del-x1'), 1); A.persist(); await sleep(60);
+  assert.deepEqual(outboxKeys(), ['expense|del-x1']); await sleep(700);
+  A.store.checklist.prep.splice(0, 1); A.persist(); await sleep(60);
+  assert.equal(outboxKeys().length, 1); await sleep(700);
+  A.day(2).items.splice(0, 1); A.persist(); await sleep(60);
+  assert.equal(outboxKeys().length, 1); await sleep(700);
+  A.store.customSpots = A.store.customSpots || [];
+  const lastId = A.day(2).items[A.day(2).items.length - 1].id;
+  A.day(2).items.push({ id: 'new-last', time: '20:00', type: '景點', title: '新增在最後' }); A.persist(); await sleep(60);
+  assert.deepEqual(outboxKeys(), ['dayItem|new-last']); await sleep(700);
+  const moved = A.day(2).items.pop(); A.day(2).items.splice(1, 0, moved); A.persist(); await sleep(60);
+  assert.deepEqual(outboxKeys(), ['dayItem|new-last']);
+  await sleep(700);
+  assert.equal(B.day(2).items[1].id, 'new-last');
+  ok('deleting / appending / moving one row only rewrites that row (gaps in ord are fine)');
+}
+
 // ---------- transient errors ----------
 db.failNext = 2; A.day(2).items[0].note = '重試'; A.persist(); await sleep(650);
 console.log('status after failures', A.sync.status());
