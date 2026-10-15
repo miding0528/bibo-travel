@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#fcf9f8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BIBO">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="BIBO Travel：西安、洛陽、徐州、南京旅遊書">
+<title>BIBO Travel</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head>
+<body>
+<div class="bg-surface font-body-md text-body-md text-on-surface flex flex-col min-h-screen">
+
+<header id="main-header" class="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+  <div class="h-16 px-gutter flex items-center justify-between">
+    <div class="flex items-center gap-space-xs">
+      <span class="font-headline-lg text-headline-lg text-primary tracking-tight">BIBO</span>
+      <span class="font-headline-md text-headline-md text-primary-container tracking-wider">TRAVEL</span>
+      <span class="mx-space-xs text-outline-variant font-label-sm text-label-sm">•</span>
+      <span class="font-headline-md text-headline-md text-on-surface" id="header-pagename">Today</span>
+    </div>
+    <div class="flex items-center gap-space-sm">
+      <a class="w-11 h-11 flex items-center justify-center rounded-full bg-surface-container-low text-primary hover:bg-primary-fixed" href="#lists" aria-label="清單"><span class="material-symbols-outlined text-[22px]">edit_note</span></a>
+      <a href="#ask" aria-label="問 BIBO"><img alt="BIBO" class="w-8 h-8 rounded-full object-cover" src="assets/stitch/logo-dog.png"></a>
+    </div>
+  </div>
+</header>
+
+<header id="spot-header" class="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]" hidden>
+  <div class="h-16 px-gutter flex items-center justify-between">
+    <div class="flex items-center gap-space-xs">
+      <button class="w-11 h-11 -ml-space-xs flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container-low" onclick="location.hash='#spots'" aria-label="返回景點列表"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button>
+      <h1 class="font-headline-md text-headline-md text-on-surface">Spot Details</h1>
+    </div>
+    <div class="flex items-center gap-space-sm">
+      <button class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low" id="spot-edit-btn" aria-label="編輯景點" hidden><span class="material-symbols-outlined text-[22px]">edit</span></button>
+      <button class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low" id="spot-delete-btn" aria-label="刪除景點" hidden><span class="material-symbols-outlined text-[22px]">delete</span></button>
+      <button class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low" id="spot-share-btn" aria-label="分享"><span class="material-symbols-outlined text-[22px]">share</span></button>
+      <img alt="BIBO" class="w-8 h-8 rounded-full object-cover" src="assets/stitch/logo-dog.png">
+    </div>
+  </div>
+</header>
+
+<main class="w-full bg-surface min-h-screen relative">
+
+<!-- ============ TODAY ============ -->
+<section data-view="today" hidden>
+<div class="flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-screen">
+<div class="flex flex-col w-full px-margin pb-space-xl">
+<div class="relative w-full mt-space-sm mb-space-md">
+<div class="flex items-end justify-between gap-space-sm">
+<div class="relative shrink-0 w-28 h-28 -mb-1 z-10">
+<div class="w-full h-full rounded-2xl bg-surface-container overflow-hidden shadow-sm flex items-end justify-center relative">
+<img class="w-full h-full object-contain object-bottom select-none pointer-events-none scale-105" src="assets/stitch/hero-bibo.png" alt="BIBO Mascot">
+<div class="absolute bottom-1 right-1 bg-primary-container text-on-primary-container px-1.5 py-0.5 rounded-full font-label-sm text-label-sm shadow-sm flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">pets</span>
+<span class="">BIBO</span>
+</div>
+</div>
+</div>
+<div class="flex-1 bg-surface-container-lowest rounded-2xl p-space-sm shadow-sm relative mb-2">
+<div class="absolute -left-2 bottom-4 w-0 h-0 border-t-[8px] border-t-transparent border-r-[10px] border-r-surface-container-lowest border-b-[8px] border-b-transparent"></div>
+<div class="flex items-center gap-1 text-primary mb-1">
+<span class="material-symbols-outlined text-[16px]">celebration</span>
+<span class="font-headline-md text-headline-md tracking-tight text-on-surface" id="today-bubble-title">今天去看龍門石窟！</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-1 mb-2" id="today-subtitle">
+          天氣乾冷，西山石窟午後光線最好
+        </p>
+<div class="flex flex-wrap items-center gap-1.5">
+<button class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm" id="today-day-badge" type="button">
+<span class="material-symbols-outlined text-[13px]">location_on</span>
+<span class="" id="today-day-badge-text">Day 4・洛陽</span>
+</button>
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[13px] text-primary">ac_unit</span>
+<span class="" id="today-weather-text">-1~6°C 記得毛帽 🧣</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<section class="w-full mb-space-lg" id="today-next-section">
+<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-fixed via-surface-container-lowest to-surface-container p-space-md shadow-md">
+<div class="absolute -right-4 -bottom-4 text-primary/10 select-none pointer-events-none">
+<span class="material-symbols-outlined text-[110px]" style="font-variation-settings: 'FILL' 1;">pets</span>
+</div>
+<div class="flex items-center justify-between relative z-10 mb-space-xs">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-container text-on-primary-container font-label-sm text-label-sm font-bold shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+<span class="">下一站</span>
+</div>
+<span class="font-label-md text-label-md text-primary font-bold" id="today-next-time">13:00 出發</span>
+</div>
+<div class="relative z-10 my-1">
+<h2 class="font-headline-lg text-headline-lg tracking-tight text-on-surface flex items-center gap-1.5">
+<span class="" id="today-next-title">龍門石窟 西山</span>
+<span class="material-symbols-outlined text-primary text-[20px]">verified</span>
+</h2>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px] text-outline">near_me</span>
+<span class="" id="today-next-note">賓陽中洞 → 古陽洞 → 奉先寺，預留 4 小時</span>
+</p>
+</div>
+<div class="grid grid-cols-2 gap-space-sm mt-space-md relative z-10" id="today-next-actions">
+<a class="flex items-center justify-center gap-1.5 h-11 px-space-md rounded-full bg-primary text-on-primary font-label-lg text-label-lg shadow-sm active:scale-95 transition-all" id="btn-navigate" href="https://uri.amap.com/search?keyword=%E9%BE%8D%E9%96%80%E7%9F%B3%E7%AA%9F&amp;city=%E6%B4%9B%E9%99%BD&amp;src=bibo&amp;callnative=1" target="_blank" rel="noopener">
+<span class="material-symbols-outlined text-[18px]">navigation</span>
+<span class="">高德導航</span>
+</a>
+<a class="flex items-center justify-center gap-1.5 h-11 px-space-md rounded-full bg-surface-container-lowest text-on-surface font-label-lg text-label-lg shadow-sm hover:bg-surface-container transition-all active:scale-95" id="btn-guide" href="#spot/longmen">
+<span class="material-symbols-outlined text-[18px] text-tertiary">auto_stories</span>
+<span class="">看介紹</span>
+</a>
+</div>
+</div>
+</section>
+<section class="w-full flex flex-col">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[22px]">route</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">今日行程</h3>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm" id="progress-chip">
+          2 / 7 已完成
+        </span>
+</div>
+<button class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-highest transition-colors active:scale-95" id="quick-add-btn">
+<span class="material-symbols-outlined text-[15px]">add</span>
+<span class="">加備忘</span>
+</button>
+</div>
+<div class="relative w-full pl-6 space-y-3.5 mt-1">
+<div class="absolute left-2.5 top-3 bottom-4 w-0.5 bg-surface-variant border-l border-dashed border-outline-variant"></div>
+<div id="today-items"></div>
+</div>
+</section>
+<section class="w-full mt-space-lg" id="today-tip-section">
+<div class="rounded-2xl bg-surface-container-low p-space-sm shadow-sm flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0"><img src="assets/stitch/tip-dog.png" alt="BIBO Tips" class="w-8 h-8 object-contain select-none pointer-events-none"></div>
+<div class="flex-1 min-w-0">
+<span class="font-label-sm text-label-sm font-bold text-primary">BIBO 的行前私房話</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate" id="today-tip-text">
+          冬季夜遊暫停，大佛亮燈別抱期待；應天門夜景照常，記得早點過去。
+        </p>
+</div>
+<button aria-label="關閉小提示" class="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:bg-surface-container transition-colors" id="dismiss-tip">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</section>
+</div>
+</div>
+</section>
+
+<!-- ============ ITINERARY / PLAN ============ -->
+<section data-view="plan" hidden>
+<div class="w-full pt-16 pb-24 bg-surface min-h-screen">
+<div class="flex flex-col w-full px-gutter space-y-space-md pb-space-xl">
+<div class="flex items-center justify-between pt-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center justify-center px-space-sm py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm">
+        11 天探險旅程
+      </span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">雙人自由行</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md shadow-sm active:translate-y-0.5 transition-all" id="plan-paste-btn" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary">content_paste</span>
+<span>貼上文字</span>
+</button>
+<button class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary-container hover:bg-primary-container/90 text-on-primary-container font-label-md text-label-md shadow-sm active:translate-y-0.5 transition-all" id="plan-library-btn" type="button">
+<span class="material-symbols-outlined text-[16px]">bookmark_add</span>
+<span>從景點庫加入</span>
+</button>
+</div>
+</div>
+<div class="w-full -mx-gutter px-gutter overflow-x-auto no-scrollbar py-1">
+<div class="flex items-center gap-space-xs min-w-max" id="date-pills"></div>
+</div>
+<div id="day-header-card"></div>
+<div class="space-y-space-sm relative" id="day-items"></div>
+<div class="pt-space-xs">
+<button class="w-full h-14 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-low text-primary flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-all" id="plan-add-btn" type="button">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[20px] font-bold">add</span>
+</div>
+<span class="font-headline-md text-headline-md font-bold text-on-surface">新增行程項目</span>
+</button>
+</div>
+<div class="flex items-center justify-center gap-2 py-space-xs text-on-surface-variant font-body-sm text-body-sm text-center">
+<span class="material-symbols-outlined text-[18px] text-primary-container">info</span>
+<span>長按左側把手可隨時拖曳排序，點擊核取方塊標記已完成</span>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ============ SPOTS ============ -->
+<section data-view="spots" hidden>
+<div class="w-full pt-16 pb-24 bg-surface min-h-screen">
+<div class="flex flex-col w-full px-margin pb-space-xl">
+<div class="relative w-full pt-space-md mb-space-md">
+<div class="flex items-end justify-between mb-space-xs px-space-xs">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="inline-block w-2.5 h-2.5 rounded-full bg-primary-container"></span>
+<span class="font-label-md text-label-md text-primary tracking-wider uppercase">Travel Diary</span>
+</div>
+<div class="font-headline-xl-mobile text-headline-xl-mobile text-on-surface">探索景點</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<div class="flex items-center gap-1.5 bg-secondary-container/60 px-space-sm py-1 rounded-full">
+<span class="material-symbols-outlined text-secondary text-[16px]">map</span>
+<span class="font-label-sm text-label-sm text-secondary font-bold" id="spot-total-count">16 處打卡點</span>
+</div>
+<button id="spot-add-btn" class="w-9 h-9 rounded-full bg-primary-container text-on-primary-container shadow-md flex items-center justify-center active:scale-90 transition-transform" type="button" aria-label="新增景點"><span class="material-symbols-outlined text-[22px]">add</span></button>
+</div>
+</div>
+<div class="relative flex items-center w-full mt-space-sm">
+<div class="w-full flex items-center bg-surface-container-lowest rounded-full px-space-md py-space-sm shadow-[2px_3px_0px_#1b1b1c] transition-all focus-within:shadow-[3px_5px_0px_#1b1b1c]">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px] mr-space-xs">search</span>
+<input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none" id="spot-search" placeholder="找景點、找美食、搜朝代..." type="text">
+<button aria-label="搜尋" class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary shadow-[1px_1px_0px_#1b1b1c] active:translate-x-0.5 active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px]">travel_explore</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-xs overflow-x-auto pb-space-sm mb-space-md -mx-margin px-margin no-scrollbar" id="city-filters">
+<button class="city-filter-btn flex-shrink-0 px-4 py-1.5 rounded-full font-label-lg text-label-lg bg-primary-container text-on-surface shadow-[2px_2px_0px_#1b1b1c] active:translate-y-0.5 transition-transform font-bold" data-city="all">
+      全部
+    </button>
+<button class="city-filter-btn flex-shrink-0 px-4 py-1.5 rounded-full font-label-lg text-label-lg bg-surface-container-low text-on-surface-variant hover:bg-secondary-fixed shadow-[1.5px_1.5px_0px_#1b1b1c] active:translate-y-0.5 transition-all" data-city="xian">
+      西安
+    </button>
+<button class="city-filter-btn flex-shrink-0 px-4 py-1.5 rounded-full font-label-lg text-label-lg bg-surface-container-low text-on-surface-variant hover:bg-secondary-fixed shadow-[1.5px_1.5px_0px_#1b1b1c] active:translate-y-0.5 transition-all" data-city="luoyang">
+      洛陽
+    </button>
+<button class="city-filter-btn flex-shrink-0 px-4 py-1.5 rounded-full font-label-lg text-label-lg bg-surface-container-low text-on-surface-variant hover:bg-secondary-fixed shadow-[1.5px_1.5px_0px_#1b1b1c] active:translate-y-0.5 transition-all" data-city="xuzhou">
+      徐州
+    </button>
+<button class="city-filter-btn flex-shrink-0 px-4 py-1.5 rounded-full font-label-lg text-label-lg bg-surface-container-low text-on-surface-variant hover:bg-secondary-fixed shadow-[1.5px_1.5px_0px_#1b1b1c] active:translate-y-0.5 transition-all" data-city="nanjing">
+      南京
+    </button>
+</div>
+<div class="flex flex-col gap-space-lg" id="spots-container"></div>
+<div class="mt-space-lg p-space-md rounded-2xl bg-secondary-container/40 flex items-center gap-space-sm shadow-[2px_3px_0px_#1b1b1c]">
+<div class="flex-shrink-0 w-11 h-11 rounded-full bg-primary-container flex items-center justify-center shadow-[1px_1px_0px_#1b1b1c] text-on-surface">
+<span class="material-symbols-outlined text-[24px]">pets</span>
+</div>
+<div class="flex flex-col">
+<div class="font-headline-md text-[14px] text-on-secondary-container">BIBO 小提示</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+        陝歷博與碑林都要提前 5 天預約，蓋上綠色「去過了」印章代表打卡成功汪！
+      </p>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ============ SPLIT EXPENSE ============ -->
+<section data-view="split" hidden>
+<div class="w-full pt-16 pb-24 bg-surface min-h-screen">
+<div class="flex flex-col w-full px-gutter pb-8 relative" id="split-root"></div>
+</div>
+</section>
+
+<!-- ============ SPOT DETAIL ============ -->
+<section data-view="spot" hidden>
+<div class="w-full pt-16 bg-surface min-h-screen">
+<div class="flex flex-col w-full pb-safe" id="spot-detail-root"></div>
+</div>
+</section>
+
+<!-- ============ CHECKLIST ============ -->
+<section data-view="lists" hidden>
+<div class="w-full pt-16 pb-24 bg-surface min-h-screen">
+<div class="flex flex-col w-full px-margin pb-space-lg" id="lists-root"></div>
+</div>
+</section>
+
+<!-- ============ TICKETS ============ -->
+<section data-view="tickets" hidden>
+<div class="w-full pt-16 pb-24 bg-surface min-h-screen">
+<div class="flex flex-col w-full px-margin pb-6 gap-space-md" id="tickets-root"></div>
+</div>
+</section>
+
+<!-- ============ ASK BIBO ============ -->
+<section data-view="ask" hidden>
+<div class="w-full pt-16 pb-24 bg-surface min-h-screen flex flex-col">
+<div class="flex flex-col w-full px-margin pb-6 gap-space-md flex-1" id="ask-root"></div>
+</div>
+</section>
+
+</main>
+
+<div id="drawer-root"></div>
+
+<nav id="bottom-nav" class="fixed bottom-0 w-full z-50 pb-safe bg-surface/80 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.05)]">
+<div class="flex items-center justify-around h-16 px-space-sm">
+<a class="nav-link flex flex-col items-center justify-center gap-space-xs min-w-[56px] min-h-[44px] px-space-sm py-1 rounded-full transition-all text-on-surface-variant" data-path="today" href="#today"><img src="assets/stitch/nav-today.png" alt="今天" class="w-6 h-6 object-contain shrink-0"><span class="font-label-md text-label-md">今天</span></a>
+<a class="nav-link flex flex-col items-center justify-center gap-space-xs min-w-[56px] min-h-[44px] px-space-sm py-1 rounded-full transition-all text-on-surface-variant" data-path="plan" href="#plan"><img src="assets/stitch/nav-plan.png" alt="行程" class="w-6 h-6 object-contain shrink-0"><span class="font-label-md text-label-md">行程</span></a>
+<a class="nav-link flex flex-col items-center justify-center gap-space-xs min-w-[56px] min-h-[44px] px-space-sm py-1 rounded-full transition-all text-on-surface-variant" data-path="spots" href="#spots"><img src="assets/stitch/nav-spots.png" alt="景點" class="w-6 h-6 object-contain shrink-0"><span class="font-label-md text-label-md">景點</span></a>
+<a class="nav-link flex flex-col items-center justify-center gap-space-xs min-w-[56px] min-h-[44px] px-space-sm py-1 rounded-full transition-all text-on-surface-variant" data-path="split" href="#split"><img src="assets/stitch/nav-split.png" alt="分帳" class="w-6 h-6 object-contain shrink-0"><span class="font-label-md text-label-md">分帳</span></a>
+</div>
+</nav>
+
+<div id="toast-root"></div>
+
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
