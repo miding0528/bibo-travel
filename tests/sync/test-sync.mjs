@@ -163,6 +163,79 @@ await Bnew2.sync.start({ hadStore: true }); await sleep(650); assert.equal(Bnew2
   putPriv('t8', {}, true); await sleep(300);
 }
 
+// ---------- seed 4 -> 5 (Xuzhou removed): joined phones, REAL seedSync from src/main.js ----------
+{
+  const fs = await import('node:fs');
+  const mainSrc = fs.readFileSync(new URL('../../src/main.js', import.meta.url), 'utf8');
+  const fn = (name) => {
+    const a = mainSrc.indexOf('\nfunction ' + name + '(');
+    assert.ok(a >= 0, 'main.js function ' + name);
+    const b = mainSrc.indexOf('\n}\n', a);
+    return mainSrc.slice(a, b + 3);
+  };
+  const src = ['timeSortKey', 'insertItemByTime', 'parseTripDate', 'sortTicketsByDate', 'currentSeedIds', 'seedIdSet', 'seedCopy', 'seedSync'].map(fn).join('\n');
+  const realSeedSync = (store) => {
+    const mk = new Function('DATA', 'STORE', 'JOINED', 'syncSeedAllowed', 'SEED_VERSION', 'LEGACY_SEED_IDS', 'persist', src + '\nreturn seedSync;');
+    mk({ days: seed.days, checklistPrep: seed.checklistPrep, checklistPacking: seed.checklistPacking, tickets: seed.tickets }, store, false, true, seed.seedVersion, { days: [], prep: [], packing: [], tickets: [] }, () => {})(false);
+  };
+  const old = JSON.parse(fs.readFileSync(new URL('./fixtures/seed-v4.json', import.meta.url), 'utf8'));
+  assert.equal(old.seedVersion, 4); assert.equal(seed.seedVersion, 5);
+  const v4Store = () => {
+    const s = freshStore();
+    s.days = old.days.map(d => ({ day: d.day, date: d.date, tag: d.tag, title: d.title, subtitle: d.subtitle, items: clone(d.items) }));
+    s.checklist.prep = clone(old.checklistPrep).map(x => ({ ...x, done: false }));
+    s.tickets = clone(old.tickets);
+    s.seedVersion = 4;
+    s.seedIds = { days: old.days.flatMap(d => d.items.map(i => i.id)), prep: old.checklistPrep.map(x => x.id), packing: seed.checklistPacking.map(x => x.id), tickets: old.tickets.map(t => t.id) };
+    return s;
+  };
+  const oldDayIds = new Set(old.days.flatMap(d => d.items.map(i => i.id)));
+  const newDayIds = new Set(seed.days.flatMap(d => d.items.map(i => i.id)));
+  const goneDay = [...oldDayIds].filter(i => !newDayIds.has(i));
+  assert.ok(goneDay.includes('d9-2') && goneDay.includes('d9-3'), 'removed Xuzhou transfer ids: ' + goneDay);
+
+  const db2 = new FakeDB();
+  const L = new Phone('Lena', db2, { store: v4Store(), seedVersion: 4 });
+  await L.sync.join('BIBO-TEST-00', 'Lena');
+  assert.equal(db2.trip.seed_version, 4);
+  const K = new Phone('Key', db2, { store: v4Store(), seedVersion: 4 });
+  await K.sync.join('BIBO-TEST-00', 'Key');
+  assert.ok(K.day(9).items.find(i => i.id === 'd9-2'), 'v4 phone has the old Xuzhou train');
+  L.day(7).items.find(i => i.id === 'd7-0').done = true;
+  L.day(9).items.find(i => i.id === 'd9-6').done = true;
+  L.day(9).items.find(i => i.id === 'd9-2').done = true;                      // ticked, but the item is going away
+  L.day(8).items.push({ id: 'u-keep-1', time: '15:00', type: '景點', title: '她自己加的行程' });
+  L.store.checklist.prep.push({ id: 'u-prep-1', group: 'other', title: '自己加的待辦', done: true });
+  L.store.checklist.prep.find(x => x.id === 'p-transport-4').done = true;
+  L.store.checklist.prep.find(x => x.id === 'p-hotel-3').done = true;       // Xuzhou hotel item, ticked, to be dropped
+  L.persist(); await sleep(700);
+  assert.ok(K.day(8).items.find(i => i.id === 'u-keep-1'));
+
+  const K5 = new Phone('Key', db2, { storage: K.storage, store: JSON.parse(JSON.stringify(K.store)), seedVersion: 5 });
+  K5.seedFn = realSeedSync;
+  await K5.sync.start({ hadStore: true }); await sleep(900);
+  assert.equal(K5.seedRuns, 1); assert.equal(db2.trip.seed_version, 5);
+  await sleep(700);
+  for (const P of [K5, L]) {
+    const ids = P.store.days.flatMap(d => d.items.map(i => i.id));
+    for (const g of goneDay) assert.ok(!ids.includes(g), P.name + ' still has removed item ' + g);
+    assert.ok(!P.store.tickets.find(t => t.id === 't5'), P.name + ' still has t5');
+    for (const g of ['p-transport-5', 'p-hotel-3', 'p-hotel-4']) assert.ok(!P.store.checklist.prep.find(x => x.id === g), P.name + ' still has ' + g);
+    assert.ok(!JSON.stringify([P.store.days, P.store.tickets, P.store.checklist]).includes('徐州'), P.name + ' still mentions 徐州');
+    assert.equal(P.store.tickets.find(t => t.id === 't4').to.name, '南京南');
+    assert.equal(P.day(7).tag, seed.days.find(d => d.day === 7).tag);
+    assert.equal(P.day(7).items.find(i => i.id === 'd7-0').done, true, P.name + ' kept d7-0 tick');
+    assert.equal(P.day(9).items.find(i => i.id === 'd9-6').done, true, P.name + ' kept d9-6 (laomendong) tick');
+    assert.ok(P.day(8).items.find(i => i.id === 'u-keep-1'), P.name + ' kept user-added itinerary item');
+    assert.equal(P.store.checklist.prep.find(x => x.id === 'u-prep-1').done, true, P.name + ' kept user-added prep item');
+    assert.equal(P.store.checklist.prep.find(x => x.id === 'p-transport-4').done, true, P.name + ' kept p-transport-4 tick');
+    assert.equal(P.day(9).items.find(i => i.id === 'd9-6').spotId, 'laomendong');
+  }
+  assert.equal(db2.items.get('dayItem|d9-2').deleted, true); assert.equal(db2.items.get('ticket|t5').deleted, true);
+  same(K5, L, 'after seed 5');
+  ok('seed 4 -> 5 (Xuzhou removed): real seedSync on a joined phone drops removed ids everywhere, keeps done ticks and user-added items');
+}
+
 // ---------- transient errors ----------
 db.failNext = 2; A.day(2).items[0].note = '重試'; A.persist(); await sleep(650);
 console.log('status after failures', A.sync.status());

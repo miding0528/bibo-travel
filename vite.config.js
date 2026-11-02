@@ -19,7 +19,7 @@ export default defineConfig({
         id: base,
         name: 'BIBO Travel',
         short_name: 'BIBO',
-        description: '西安、洛陽、徐州、南京旅遊書',
+        description: '西安、洛陽、南京旅遊書',
         lang: 'zh-TW',
         display: 'standalone',
         orientation: 'portrait',

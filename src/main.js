@@ -1149,7 +1149,7 @@ function pasteTextDrawerHTML(){
     +'<div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-primary text-[22px]" style="font-variation-settings: \'FILL\' 1;">content_paste</span><h2 class="font-headline-lg text-headline-lg text-on-surface font-black">貼上文字</h2></div>'
     +'<button aria-label="關閉" class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button" onclick="closeDrawer()"><span class="material-symbols-outlined text-[18px]">close</span></button>'
     +'</div>'
-    +'<div class="bg-surface-container-lowest rounded-xl p-space-sm shadow-sm"><textarea id="pt-input" rows="5" class="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none placeholder:text-outline" placeholder="09:30 徐州東站\n10:30–12:00 高鐵到南京南 注意月台"></textarea></div>'
+    +'<div class="bg-surface-container-lowest rounded-xl p-space-sm shadow-sm"><textarea id="pt-input" rows="5" class="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none placeholder:text-outline" placeholder="09:30 南京南站\n10:30–12:00 高鐵到上海虹橋 注意月台"></textarea></div>'
     +'<button class="w-full py-2.5 rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface font-label-lg text-label-lg font-bold shadow-sm" id="pt-preview-btn" type="button">預覽</button>'
     +'<div class="flex flex-col gap-space-xs" id="pt-preview-list"></div>'
     +'<button class="w-full py-3.5 px-space-md rounded-full bg-primary-container text-on-primary font-headline-lg text-headline-lg font-black shadow-lg flex items-center justify-center gap-space-xs transition-transform active:scale-[0.98] hidden" id="pt-confirm-btn" type="button"><span class="material-symbols-outlined text-[24px]">bookmark_added</span><span>加入 Day '+state.selectedDay+'</span></button>';
@@ -1183,7 +1183,7 @@ function spotThumbHTML(spot){
   return '<div class="w-full h-full flex items-center justify-center text-outline"><span class="material-symbols-outlined text-[20px]">add_location_alt</span></div>';
 }
 function spotLibraryDrawerHTML(){
-  var cityOrder = ['xian','luoyang','xuzhou','nanjing','shanghai'];
+  var cityOrder = ['xian','luoyang','nanjing','shanghai'];
   var groups = cityOrder.map(function(c){
     var list = allSpots().filter(function(s){ return s.city===c; });
     if(!list.length) return '';
@@ -1233,9 +1233,9 @@ document.addEventListener('DOMContentLoaded', function(){
 
 /* ---------------- SPOTS ---------------- */
 
-var CITY_LABEL = { xian:'西安．古都長安', luoyang:'洛陽．神都風華', nanjing:'南京．金陵風雅', xuzhou:'徐州．漢風古韻', shanghai:'上海．轉機一瞥' };
-var CITY_BAR = { xian:'bg-primary-container', luoyang:'bg-secondary', nanjing:'bg-tertiary-container', xuzhou:'bg-outline', shanghai:'bg-secondary-container' };
-var CITY_COUNT_CLASS = { xian:'bg-primary-fixed text-on-primary-fixed', luoyang:'bg-secondary-fixed text-on-secondary-fixed-variant', nanjing:'bg-tertiary-fixed text-on-tertiary-fixed-variant', xuzhou:'bg-surface-container-high text-on-surface-variant', shanghai:'bg-secondary-container text-on-secondary-container' };
+var CITY_LABEL = { xian:'西安．古都長安', luoyang:'洛陽．神都風華', nanjing:'南京．金陵風雅', shanghai:'上海．轉機一瞥' };
+var CITY_BAR = { xian:'bg-primary-container', luoyang:'bg-secondary', nanjing:'bg-tertiary-container', shanghai:'bg-secondary-container' };
+var CITY_COUNT_CLASS = { xian:'bg-primary-fixed text-on-primary-fixed', luoyang:'bg-secondary-fixed text-on-secondary-fixed-variant', nanjing:'bg-tertiary-fixed text-on-tertiary-fixed-variant', shanghai:'bg-secondary-container text-on-secondary-container' };
 
 function spotCardHTML(spot){
   var visited = isSpotVisited(spot.id);
@@ -1267,7 +1267,7 @@ var EMPTY_SLOT_HTML = '<div class="flex flex-col items-center justify-center p-s
 function renderSpots(){
   var spots = allSpots();
   document.getElementById('spot-total-count').textContent = spots.length + ' 處打卡點';
-  var cities = ['xian','luoyang','xuzhou','nanjing','shanghai'];
+  var cities = ['xian','luoyang','nanjing','shanghai'];
   var html = cities.map(function(cityKey){
     var list = spots.filter(function(s){ return s.city === cityKey; });
     if(list.length === 0) return '';
@@ -1327,7 +1327,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
 /* ---------------- NEW / EDIT CUSTOM SPOT DRAWER ---------------- */
 
-var CITY_KEYS = [{key:'xian',label:'西安'},{key:'luoyang',label:'洛陽'},{key:'xuzhou',label:'徐州'},{key:'nanjing',label:'南京'},{key:'shanghai',label:'上海'}];
+var CITY_KEYS = [{key:'xian',label:'西安'},{key:'luoyang',label:'洛陽'},{key:'nanjing',label:'南京'},{key:'shanghai',label:'上海'}];
 
 function spotEditDrawerHTML(spot){
   var isEdit = !!spot;
@@ -2245,7 +2245,7 @@ function openShareFallbackDrawer(text){
 }
 
 function cityName(cityKey){
-  var map = { xian:'西安', luoyang:'洛陽', nanjing:'南京', xuzhou:'徐州', shanghai:'上海' };
+  var map = { xian:'西安', luoyang:'洛陽', nanjing:'南京', shanghai:'上海' };
   return map[cityKey] || cityKey;
 }
 

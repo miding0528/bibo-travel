@@ -1,6 +1,6 @@
 # BIBO Travel
 
-Lena 與 Key 的 2026/12/24–2027/01/03 西安、洛陽、徐州、南京旅遊書。網頁版 PWA，可安裝到手機桌面、離線使用。
+Lena 與 Key 的 2026/12/24–2027/01/03 西安、洛陽、南京旅遊書。網頁版 PWA，可安裝到手機桌面、離線使用。
 
 - 網址：https://miding0528.github.io/bibo-travel/
 - 技術：Vite 6 + 原生 JavaScript（無框架）、Tailwind CSS v3（本機編譯）、vite-plugin-pwa（Workbox generateSW）
