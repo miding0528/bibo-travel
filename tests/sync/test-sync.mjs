@@ -179,7 +179,7 @@ await Bnew2.sync.start({ hadStore: true }); await sleep(650); assert.equal(Bnew2
     mk({ days: seed.days, checklistPrep: seed.checklistPrep, checklistPacking: seed.checklistPacking, tickets: seed.tickets }, store, false, true, seed.seedVersion, { days: [], prep: [], packing: [], tickets: [] }, () => {})(false);
   };
   const old = JSON.parse(fs.readFileSync(new URL('./fixtures/seed-v4.json', import.meta.url), 'utf8'));
-  assert.equal(old.seedVersion, 4); assert.equal(seed.seedVersion, 5);
+  assert.equal(old.seedVersion, 4); assert.ok(seed.seedVersion >= 5);
   const v4Store = () => {
     const s = freshStore();
     s.days = old.days.map(d => ({ day: d.day, date: d.date, tag: d.tag, title: d.title, subtitle: d.subtitle, items: clone(d.items) }));
@@ -211,10 +211,10 @@ await Bnew2.sync.start({ hadStore: true }); await sleep(650); assert.equal(Bnew2
   L.persist(); await sleep(700);
   assert.ok(K.day(8).items.find(i => i.id === 'u-keep-1'));
 
-  const K5 = new Phone('Key', db2, { storage: K.storage, store: JSON.parse(JSON.stringify(K.store)), seedVersion: 5 });
+  const K5 = new Phone('Key', db2, { storage: K.storage, store: JSON.parse(JSON.stringify(K.store)), seedVersion: seed.seedVersion });
   K5.seedFn = realSeedSync;
   await K5.sync.start({ hadStore: true }); await sleep(900);
-  assert.equal(K5.seedRuns, 1); assert.equal(db2.trip.seed_version, 5);
+  assert.equal(K5.seedRuns, 1); assert.equal(db2.trip.seed_version, seed.seedVersion);
   await sleep(700);
   for (const P of [K5, L]) {
     const ids = P.store.days.flatMap(d => d.items.map(i => i.id));

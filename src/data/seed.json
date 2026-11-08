@@ -1,5 +1,5 @@
 {
- "seedVersion": 5,
+ "seedVersion": 6,
  "weekday": {
   "12/24": "週四",
   "12/25": "週五",
@@ -2791,6 +2791,26 @@
    "id": "k-other-4",
    "group": "other",
    "title": "手機掛繩"
+  },
+  {
+   "id": "k-clothes-11",
+   "group": "clothes",
+   "title": "發熱褲／厚褲（不要薄牛仔褲）"
+  },
+  {
+   "id": "k-clothes-12",
+   "group": "clothes",
+   "title": "厚襪或羊毛襪"
+  },
+  {
+   "id": "k-clothes-13",
+   "group": "clothes",
+   "title": "防水手套（老君山用）"
+  },
+  {
+   "id": "k-clothes-14",
+   "group": "clothes",
+   "title": "暖暖包（貼式，早晚出門與老君山）"
   }
  ],
  "tickets": [
